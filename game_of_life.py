@@ -11,33 +11,75 @@ Rules:
 import time
 import sys
 import os
+import random
+
+
+class Cell:
+    """Represents a customizable cell in the Game of Life"""
+    
+    def __init__(self, alive=False, name="", color="white", symbol="█"):
+        """
+        Initialize a cell with custom properties
+        
+        Args:
+            alive: Whether the cell is alive
+            name: Custom name for the cell
+            color: Color for the cell (default: white)
+            symbol: Symbol to display for the cell (default: █)
+        """
+        self.alive = alive
+        self.name = name
+        self.color = color
+        self.symbol = symbol
+    
+    def __bool__(self):
+        """Allow cell to be used in boolean context"""
+        return self.alive
+    
+    def copy(self):
+        """Create a copy of this cell"""
+        return Cell(self.alive, self.name, self.color, self.symbol)
 
 
 class GameOfLife:
     """Conway's Game of Life simulator"""
     
-    def __init__(self, width=40, height=20):
+    def __init__(self, width=40, height=20, mutation_rate=0.0):
         """
         Initialize the Game of Life grid
         
         Args:
             width: Width of the grid
             height: Height of the grid
+            mutation_rate: Probability of random mutation (0.0 to 1.0)
         """
         self.width = width
         self.height = height
-        self.grid = [[False for _ in range(width)] for _ in range(height)]
+        self.grid = [[Cell() for _ in range(width)] for _ in range(height)]
         self.generation = 0
+        self.mutation_rate = mutation_rate
+        self.cell_types = []  # Store custom cell types
     
-    def set_cell(self, x, y, alive=True):
-        """Set a cell to alive or dead"""
+    def set_cell(self, x, y, alive=True, cell_type=None):
+        """
+        Set a cell to alive or dead
+        
+        Args:
+            x: Row position
+            y: Column position
+            alive: Whether the cell should be alive
+            cell_type: Optional Cell object with custom properties
+        """
         if 0 <= x < self.height and 0 <= y < self.width:
-            self.grid[x][y] = alive
+            if cell_type is not None:
+                self.grid[x][y] = cell_type.copy()
+            else:
+                self.grid[x][y].alive = alive
     
     def get_cell(self, x, y):
         """Get the state of a cell"""
         if 0 <= x < self.height and 0 <= y < self.width:
-            return self.grid[x][y]
+            return self.grid[x][y].alive
         return False
     
     def count_neighbors(self, x, y):
@@ -49,35 +91,90 @@ class GameOfLife:
                     continue
                 nx, ny = x + dx, y + dy
                 if 0 <= nx < self.height and 0 <= ny < self.width:
-                    if self.grid[nx][ny]:
+                    if self.grid[nx][ny].alive:
                         count += 1
         return count
     
     def next_generation(self):
         """Compute the next generation based on Game of Life rules"""
-        new_grid = [[False for _ in range(self.width)] for _ in range(self.height)]
+        new_grid = [[Cell() for _ in range(self.width)] for _ in range(self.height)]
         
         for x in range(self.height):
             for y in range(self.width):
                 neighbors = self.count_neighbors(x, y)
-                alive = self.grid[x][y]
+                alive = self.grid[x][y].alive
                 
                 # Apply Game of Life rules
                 if alive:
                     # Live cell with 2 or 3 neighbors survives
                     if neighbors == 2 or neighbors == 3:
-                        new_grid[x][y] = True
+                        new_grid[x][y] = self.grid[x][y].copy()
                 else:
                     # Dead cell with exactly 3 neighbors becomes alive
                     if neighbors == 3:
-                        new_grid[x][y] = True
+                        # Inherit properties from a random neighbor
+                        new_grid[x][y] = self._get_random_neighbor_cell(x, y).copy()
+                        new_grid[x][y].alive = True
+                
+                # Apply mutations
+                if self.mutation_rate > 0 and random.random() < self.mutation_rate:
+                    if new_grid[x][y].alive:
+                        # Mutate living cell - randomly kill it or change properties
+                        if random.random() < 0.5:
+                            new_grid[x][y].alive = False
+                        else:
+                            self._mutate_cell(new_grid[x][y])
+                    else:
+                        # Randomly birth a cell through mutation
+                        if random.random() < 0.3:
+                            new_grid[x][y].alive = True
+                            self._mutate_cell(new_grid[x][y])
         
         self.grid = new_grid
         self.generation += 1
     
+    def _get_random_neighbor_cell(self, x, y):
+        """Get a random alive neighbor cell"""
+        neighbors = []
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                if dx == 0 and dy == 0:
+                    continue
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < self.height and 0 <= ny < self.width:
+                    if self.grid[nx][ny].alive:
+                        neighbors.append(self.grid[nx][ny])
+        
+        if neighbors:
+            return random.choice(neighbors)
+        return Cell(alive=True)
+    
+    def _mutate_cell(self, cell):
+        """Apply random mutation to a cell's properties"""
+        colors = ["white", "red", "green", "blue", "yellow", "magenta", "cyan"]
+        symbols = ["█", "●", "■", "◆", "★", "♦", "▲"]
+        
+        if random.random() < 0.5:
+            cell.color = random.choice(colors)
+        if random.random() < 0.3:
+            cell.symbol = random.choice(symbols)
+    
+    def add_cell_type(self, name, color="white", symbol="█"):
+        """
+        Add a custom cell type
+        
+        Args:
+            name: Name of the cell type
+            color: Color for this cell type
+            symbol: Symbol to display for this cell type
+        """
+        cell_type = Cell(alive=True, name=name, color=color, symbol=symbol)
+        self.cell_types.append(cell_type)
+        return cell_type
+    
     def clear_grid(self):
         """Clear all cells"""
-        self.grid = [[False for _ in range(self.width)] for _ in range(self.height)]
+        self.grid = [[Cell() for _ in range(self.width)] for _ in range(self.height)]
         self.generation = 0
     
     def load_pattern(self, pattern_name):
@@ -114,11 +211,11 @@ class GameOfLife:
         # Clear screen
         os.system('clear' if os.name == 'posix' else 'cls')
         
-        print(f"Generation: {self.generation}")
+        print(f"Generation: {self.generation} | Mutation Rate: {self.mutation_rate:.1%}")
         print("=" * (self.width + 2))
         
         for row in self.grid:
-            print("|" + "".join("█" if cell else " " for cell in row) + "|")
+            print("|" + "".join(cell.symbol if cell.alive else " " for cell in row) + "|")
         
         print("=" * (self.width + 2))
     
@@ -126,7 +223,7 @@ class GameOfLife:
         """String representation of the grid"""
         result = f"Generation: {self.generation}\n"
         for row in self.grid:
-            result += "".join("█" if cell else "." for cell in row) + "\n"
+            result += "".join(cell.symbol if cell.alive else "." for cell in row) + "\n"
         return result
 
 
@@ -140,10 +237,19 @@ def main():
     print("3. Toad")
     print("4. Beacon")
     print("5. Pulsar")
+    print("6. Custom cells with character creation")
     print("\nPress Ctrl+C to exit\n")
     
     # Get user choice
-    choice = input("Select a pattern (1-5): ").strip()
+    choice = input("Select a pattern (1-6): ").strip()
+    
+    # Get mutation rate
+    mutation_input = input("Enter mutation rate (0.0-1.0, default 0.0): ").strip()
+    try:
+        mutation_rate = float(mutation_input) if mutation_input else 0.0
+        mutation_rate = max(0.0, min(1.0, mutation_rate))
+    except ValueError:
+        mutation_rate = 0.0
     
     patterns = {
         '1': 'glider',
@@ -153,11 +259,52 @@ def main():
         '5': 'pulsar'
     }
     
-    pattern = patterns.get(choice, 'glider')
-    
     # Create game instance
-    game = GameOfLife(width=50, height=25)
-    game.load_pattern(pattern)
+    game = GameOfLife(width=50, height=25, mutation_rate=mutation_rate)
+    
+    if choice == '6':
+        # Character creation mode
+        print("\n--- Character Creation ---")
+        num_types = input("How many custom cell types? (1-5): ").strip()
+        try:
+            num_types = max(1, min(5, int(num_types)))
+        except ValueError:
+            num_types = 1
+        
+        symbols = ["█", "●", "■", "◆", "★"]
+        colors = ["white", "red", "green", "blue", "yellow"]
+        
+        for i in range(num_types):
+            print(f"\nCell Type {i + 1}:")
+            name = input(f"  Name (default: Cell{i+1}): ").strip() or f"Cell{i+1}"
+            
+            print("  Available symbols: 1=█ 2=● 3=■ 4=◆ 5=★")
+            symbol_choice = input(f"  Symbol (1-5, default: {i+1}): ").strip()
+            try:
+                symbol = symbols[int(symbol_choice) - 1]
+            except (ValueError, IndexError):
+                symbol = symbols[i % len(symbols)]
+            
+            print("  Available colors: 1=white 2=red 3=green 4=blue 5=yellow")
+            color_choice = input(f"  Color (1-5, default: {i+1}): ").strip()
+            try:
+                color = colors[int(color_choice) - 1]
+            except (ValueError, IndexError):
+                color = colors[i % len(colors)]
+            
+            cell_type = game.add_cell_type(name, color, symbol)
+            print(f"  Created: {name} ({symbol})")
+        
+        # Place custom cells in a pattern
+        print("\nCreating pattern with custom cells...")
+        # Create a simple glider-like pattern with custom cells
+        if game.cell_types:
+            for i, (x, y) in enumerate([(1, 2), (2, 3), (3, 1), (3, 2), (3, 3)]):
+                cell_type = game.cell_types[i % len(game.cell_types)]
+                game.set_cell(x, y, alive=True, cell_type=cell_type)
+    else:
+        pattern = patterns.get(choice, 'glider')
+        game.load_pattern(pattern)
     
     try:
         # Run simulation

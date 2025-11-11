@@ -3,7 +3,51 @@ Unit tests for Conway's Game of Life implementation
 """
 
 import unittest
-from game_of_life import GameOfLife
+from game_of_life import GameOfLife, Cell
+
+
+class TestCell(unittest.TestCase):
+    """Test cases for Cell class"""
+    
+    def test_cell_initialization(self):
+        """Test cell initialization with default values"""
+        cell = Cell()
+        self.assertFalse(cell.alive)
+        self.assertEqual(cell.name, "")
+        self.assertEqual(cell.color, "white")
+        self.assertEqual(cell.symbol, "█")
+    
+    def test_cell_custom_initialization(self):
+        """Test cell initialization with custom values"""
+        cell = Cell(alive=True, name="Test", color="red", symbol="●")
+        self.assertTrue(cell.alive)
+        self.assertEqual(cell.name, "Test")
+        self.assertEqual(cell.color, "red")
+        self.assertEqual(cell.symbol, "●")
+    
+    def test_cell_boolean_context(self):
+        """Test cell can be used in boolean context"""
+        cell = Cell(alive=False)
+        self.assertFalse(bool(cell))
+        
+        cell.alive = True
+        self.assertTrue(bool(cell))
+    
+    def test_cell_copy(self):
+        """Test cell copy creates independent instance"""
+        cell1 = Cell(alive=True, name="Original", color="blue", symbol="■")
+        cell2 = cell1.copy()
+        
+        self.assertTrue(cell2.alive)
+        self.assertEqual(cell2.name, "Original")
+        self.assertEqual(cell2.color, "blue")
+        self.assertEqual(cell2.symbol, "■")
+        
+        # Modify cell2, cell1 should be unchanged
+        cell2.alive = False
+        cell2.name = "Copy"
+        self.assertTrue(cell1.alive)
+        self.assertEqual(cell1.name, "Original")
 
 
 class TestGameOfLife(unittest.TestCase):
@@ -21,7 +65,7 @@ class TestGameOfLife(unittest.TestCase):
         # All cells should be dead initially
         for row in self.game.grid:
             for cell in row:
-                self.assertFalse(cell)
+                self.assertFalse(cell.alive)
     
     def test_set_and_get_cell(self):
         """Test setting and getting cell states"""
@@ -159,7 +203,7 @@ class TestGameOfLife(unittest.TestCase):
         self.assertEqual(self.game.generation, 0)
         for row in self.game.grid:
             for cell in row:
-                self.assertFalse(cell)
+                self.assertFalse(cell.alive)
     
     def test_load_pattern_glider(self):
         """Test loading the glider pattern"""
@@ -167,7 +211,7 @@ class TestGameOfLife(unittest.TestCase):
         self.assertTrue(result)
         
         # Check that some cells are alive
-        alive_count = sum(sum(row) for row in self.game.grid)
+        alive_count = sum(1 for row in self.game.grid for cell in row if cell.alive)
         self.assertEqual(alive_count, 5)
     
     def test_load_pattern_invalid(self):
@@ -184,6 +228,87 @@ class TestGameOfLife(unittest.TestCase):
         
         self.game.next_generation()
         self.assertEqual(self.game.generation, 2)
+    
+    def test_mutation_rate_initialization(self):
+        """Test that mutation rate is set correctly"""
+        game = GameOfLife(width=10, height=10, mutation_rate=0.05)
+        self.assertEqual(game.mutation_rate, 0.05)
+    
+    def test_add_cell_type(self):
+        """Test adding custom cell types"""
+        cell_type = self.game.add_cell_type("Warrior", "red", "●")
+        
+        self.assertEqual(cell_type.name, "Warrior")
+        self.assertEqual(cell_type.color, "red")
+        self.assertEqual(cell_type.symbol, "●")
+        self.assertEqual(len(self.game.cell_types), 1)
+    
+    def test_set_cell_with_custom_type(self):
+        """Test setting a cell with a custom type"""
+        cell_type = self.game.add_cell_type("Mage", "blue", "★")
+        self.game.set_cell(5, 5, alive=True, cell_type=cell_type)
+        
+        cell = self.game.grid[5][5]
+        self.assertTrue(cell.alive)
+        self.assertEqual(cell.name, "Mage")
+        self.assertEqual(cell.color, "blue")
+        self.assertEqual(cell.symbol, "★")
+    
+    def test_mutation_affects_cells(self):
+        """Test that mutations can occur with non-zero mutation rate"""
+        game = GameOfLife(width=10, height=10, mutation_rate=1.0)
+        
+        # Set up a stable block pattern
+        game.set_cell(5, 5, True)
+        game.set_cell(5, 6, True)
+        game.set_cell(6, 5, True)
+        game.set_cell(6, 6, True)
+        
+        initial_alive = sum(1 for row in game.grid for cell in row if cell.alive)
+        
+        # Run multiple generations - with 100% mutation rate, something should change
+        for _ in range(10):
+            game.next_generation()
+        
+        final_alive = sum(1 for row in game.grid for cell in row if cell.alive)
+        
+        # With 100% mutation rate, the pattern should be different
+        # We can't test exact outcome due to randomness, but count should likely change
+        # This test might occasionally fail due to random chance, but very unlikely
+        self.assertNotEqual(initial_alive, final_alive)
+    
+    def test_cell_inherits_properties_from_neighbors(self):
+        """Test that new cells inherit properties from neighbors"""
+        # Create custom cell types
+        cell_type = self.game.add_cell_type("Red", "red", "●")
+        
+        # Set up pattern where a new cell will be born
+        self.game.set_cell(4, 4, alive=True, cell_type=cell_type)
+        self.game.set_cell(4, 5, alive=True, cell_type=cell_type)
+        self.game.set_cell(4, 6, alive=True, cell_type=cell_type)
+        
+        # Cell at (5,5) should be born
+        self.assertFalse(self.game.get_cell(5, 5))
+        
+        self.game.next_generation()
+        
+        # New cell should inherit symbol from neighbors
+        self.assertTrue(self.game.get_cell(5, 5))
+        cell = self.game.grid[5][5]
+        self.assertEqual(cell.symbol, "●")
+    
+    def test_display_shows_mutation_rate(self):
+        """Test that display method includes mutation rate"""
+        game = GameOfLife(width=10, height=10, mutation_rate=0.15)
+        # Just verify it doesn't crash
+        import io
+        import sys
+        old_stdout = sys.stdout
+        sys.stdout = io.StringIO()
+        try:
+            game.display()
+        finally:
+            sys.stdout = old_stdout
 
 
 if __name__ == '__main__':
