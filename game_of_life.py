@@ -112,9 +112,14 @@ class GameOfLife:
                 else:
                     # Dead cell with exactly 3 neighbors becomes alive
                     if neighbors == 3:
-                        # Inherit properties from a random neighbor
-                        new_grid[x][y] = self._get_random_neighbor_cell(x, y).copy()
-                        new_grid[x][y].alive = True
+                        # Create offspring from two compatible parent cells
+                        alive_neighbors = self._get_alive_neighbors(x, y)
+                        parent1, parent2 = self._select_parents(alive_neighbors)
+                        if parent1:
+                            new_grid[x][y] = self._create_offspring(parent1, parent2)
+                        else:
+                            # Fallback if no parents available
+                            new_grid[x][y].alive = True
                 
                 # Apply mutations
                 if self.mutation_rate > 0 and random.random() < self.mutation_rate:
@@ -148,6 +153,102 @@ class GameOfLife:
         if neighbors:
             return random.choice(neighbors)
         return Cell(alive=True)
+    
+    def _get_alive_neighbors(self, x, y):
+        """Get list of all alive neighbor cells"""
+        neighbors = []
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                if dx == 0 and dy == 0:
+                    continue
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < self.height and 0 <= ny < self.width:
+                    if self.grid[nx][ny].alive:
+                        neighbors.append(self.grid[nx][ny])
+        return neighbors
+    
+    def _are_compatible(self, cell1, cell2):
+        """
+        Check if two cells are compatible for producing offspring
+        
+        Cells are compatible if:
+        - They have different symbols OR different colors (promoting diversity)
+        - OR both have custom names (indicating they are custom cell types)
+        """
+        # If both have custom names, they're compatible
+        if cell1.name and cell2.name:
+            return True
+        
+        # If they differ in appearance, they're compatible
+        if cell1.symbol != cell2.symbol or cell1.color != cell2.color:
+            return True
+        
+        return False
+    
+    def _select_parents(self, neighbors):
+        """
+        Select 2 compatible parent cells from the list of neighbors
+        
+        Args:
+            neighbors: List of alive neighbor cells
+            
+        Returns:
+            Tuple of (parent1, parent2) or (parent, None) if only one parent available
+        """
+        if len(neighbors) < 2:
+            return (neighbors[0] if neighbors else None, None)
+        
+        # Try to find compatible parents
+        random.shuffle(neighbors)
+        for i in range(len(neighbors)):
+            for j in range(i + 1, len(neighbors)):
+                if self._are_compatible(neighbors[i], neighbors[j]):
+                    return (neighbors[i], neighbors[j])
+        
+        # If no compatible pair found, use first two neighbors
+        return (neighbors[0], neighbors[1])
+    
+    def _create_offspring(self, parent1, parent2):
+        """
+        Create offspring cell from two parent cells
+        
+        The offspring inherits properties from both parents:
+        - Symbol: randomly chosen from one parent
+        - Color: randomly chosen from one parent
+        - Name: blended from both parents if they have names
+        
+        Args:
+            parent1: First parent cell
+            parent2: Second parent cell (can be None)
+            
+        Returns:
+            New Cell with blended properties
+        """
+        offspring = Cell(alive=True)
+        
+        if parent2 is None:
+            # Single parent - just inherit properties
+            offspring.symbol = parent1.symbol
+            offspring.color = parent1.color
+            offspring.name = parent1.name
+        else:
+            # Two parents - blend properties
+            offspring.symbol = random.choice([parent1.symbol, parent2.symbol])
+            offspring.color = random.choice([parent1.color, parent2.color])
+            
+            # Blend names if both parents have names
+            if parent1.name and parent2.name:
+                # Create hybrid name
+                if random.random() < 0.5:
+                    offspring.name = f"{parent1.name}-{parent2.name}"
+                else:
+                    offspring.name = f"{parent2.name}-{parent1.name}"
+            elif parent1.name:
+                offspring.name = parent1.name
+            elif parent2.name:
+                offspring.name = parent2.name
+        
+        return offspring
     
     def _mutate_cell(self, cell):
         """Apply random mutation to a cell's properties"""

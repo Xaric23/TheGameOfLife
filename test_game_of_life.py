@@ -309,6 +309,154 @@ class TestGameOfLife(unittest.TestCase):
             game.display()
         finally:
             sys.stdout = old_stdout
+    
+    def test_offspring_from_two_parents(self):
+        """Test that offspring inherit properties from two parent cells"""
+        # Create two custom cell types
+        parent1_type = self.game.add_cell_type("Red", "red", "●")
+        parent2_type = self.game.add_cell_type("Blue", "blue", "■")
+        
+        # Set up pattern where a new cell will be born at (5,5)
+        # with exactly 3 neighbors of different types
+        self.game.set_cell(4, 4, alive=True, cell_type=parent1_type)
+        self.game.set_cell(4, 5, alive=True, cell_type=parent2_type)
+        self.game.set_cell(4, 6, alive=True, cell_type=parent1_type)
+        
+        # Cell at (5,5) should be dead initially
+        self.assertFalse(self.game.get_cell(5, 5))
+        
+        self.game.next_generation()
+        
+        # New cell should be born and inherit from parents
+        self.assertTrue(self.game.get_cell(5, 5))
+        offspring = self.game.grid[5][5]
+        
+        # Offspring should have inherited symbol from one of the parents
+        self.assertIn(offspring.symbol, ["●", "■"])
+        
+        # Offspring should have inherited color from one of the parents
+        self.assertIn(offspring.color, ["red", "blue"])
+        
+        # Offspring should have a hybrid name
+        self.assertTrue(offspring.name)  # Should have a name
+    
+    def test_compatibility_check(self):
+        """Test that compatibility check works correctly"""
+        # Different symbols - should be compatible
+        cell1 = Cell(alive=True, symbol="●", color="white")
+        cell2 = Cell(alive=True, symbol="■", color="white")
+        self.assertTrue(self.game._are_compatible(cell1, cell2))
+        
+        # Different colors - should be compatible
+        cell3 = Cell(alive=True, symbol="●", color="red")
+        cell4 = Cell(alive=True, symbol="●", color="blue")
+        self.assertTrue(self.game._are_compatible(cell3, cell4))
+        
+        # Both have names - should be compatible
+        cell5 = Cell(alive=True, name="Type1", symbol="●", color="white")
+        cell6 = Cell(alive=True, name="Type2", symbol="●", color="white")
+        self.assertTrue(self.game._are_compatible(cell5, cell6))
+        
+        # Same appearance and no names - should be incompatible
+        cell7 = Cell(alive=True, symbol="●", color="white")
+        cell8 = Cell(alive=True, symbol="●", color="white")
+        self.assertFalse(self.game._are_compatible(cell7, cell8))
+    
+    def test_select_parents(self):
+        """Test parent selection from neighbors"""
+        # Create diverse neighbors
+        neighbors = [
+            Cell(alive=True, name="Red", color="red", symbol="●"),
+            Cell(alive=True, name="Blue", color="blue", symbol="■"),
+            Cell(alive=True, name="Green", color="green", symbol="◆")
+        ]
+        
+        parent1, parent2 = self.game._select_parents(neighbors)
+        
+        # Should return two parents
+        self.assertIsNotNone(parent1)
+        self.assertIsNotNone(parent2)
+        
+        # Parents should be compatible
+        self.assertTrue(self.game._are_compatible(parent1, parent2))
+    
+    def test_select_parents_single_neighbor(self):
+        """Test parent selection with only one neighbor"""
+        neighbors = [Cell(alive=True, name="Alone", color="red", symbol="●")]
+        
+        parent1, parent2 = self.game._select_parents(neighbors)
+        
+        # Should return one parent and None
+        self.assertIsNotNone(parent1)
+        self.assertIsNone(parent2)
+    
+    def test_create_offspring_from_two_parents(self):
+        """Test offspring creation from two parents"""
+        parent1 = Cell(alive=True, name="Fire", color="red", symbol="●")
+        parent2 = Cell(alive=True, name="Ice", color="blue", symbol="■")
+        
+        offspring = self.game._create_offspring(parent1, parent2)
+        
+        # Offspring should be alive
+        self.assertTrue(offspring.alive)
+        
+        # Offspring should inherit symbol from one parent
+        self.assertIn(offspring.symbol, [parent1.symbol, parent2.symbol])
+        
+        # Offspring should inherit color from one parent
+        self.assertIn(offspring.color, [parent1.color, parent2.color])
+        
+        # Offspring should have a hybrid name
+        self.assertTrue(offspring.name)
+        self.assertTrue("Fire" in offspring.name or "Ice" in offspring.name)
+    
+    def test_create_offspring_from_single_parent(self):
+        """Test offspring creation from single parent"""
+        parent = Cell(alive=True, name="Lone", color="green", symbol="◆")
+        
+        offspring = self.game._create_offspring(parent, None)
+        
+        # Offspring should inherit all properties from single parent
+        self.assertTrue(offspring.alive)
+        self.assertEqual(offspring.symbol, parent.symbol)
+        self.assertEqual(offspring.color, parent.color)
+        self.assertEqual(offspring.name, parent.name)
+    
+    def test_get_alive_neighbors(self):
+        """Test getting list of alive neighbors"""
+        # Set up pattern with specific neighbors
+        self.game.set_cell(4, 4, True)
+        self.game.set_cell(4, 5, True)
+        self.game.set_cell(5, 4, True)
+        
+        neighbors = self.game._get_alive_neighbors(5, 5)
+        
+        # Should have exactly 3 neighbors
+        self.assertEqual(len(neighbors), 3)
+        
+        # All neighbors should be alive
+        for neighbor in neighbors:
+            self.assertTrue(neighbor.alive)
+    
+    def test_offspring_breeding_across_generations(self):
+        """Test that offspring can breed with other cells in subsequent generations"""
+        # Create initial population with two types
+        type1 = self.game.add_cell_type("Alpha", "red", "●")
+        type2 = self.game.add_cell_type("Beta", "blue", "■")
+        
+        # Set up a pattern that will produce offspring
+        self.game.set_cell(4, 4, alive=True, cell_type=type1)
+        self.game.set_cell(4, 5, alive=True, cell_type=type2)
+        self.game.set_cell(4, 6, alive=True, cell_type=type1)
+        self.game.set_cell(5, 4, alive=True, cell_type=type2)
+        
+        # Run multiple generations
+        for _ in range(3):
+            self.game.next_generation()
+        
+        # Check that there are still living cells (pattern is evolving)
+        alive_count = sum(1 for row in self.game.grid for cell in row if cell.alive)
+        self.assertGreater(alive_count, 0)
 
 
 if __name__ == '__main__':

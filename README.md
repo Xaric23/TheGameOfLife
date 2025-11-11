@@ -15,6 +15,20 @@ The Game of Life is a zero-player game where the evolution is determined by its 
 
 ## New Features
 
+### Offspring and Cell Birthing System
+
+Experience genetic diversity with the offspring system! When a new cell is born (following the standard rule of having exactly 3 neighbors):
+
+- **Two-Parent Breeding**: The new cell inherits properties from **two compatible parent cells** selected from its neighbors
+- **Compatibility System**: Cells are compatible if they:
+  - Have different visual properties (symbol or color), promoting diversity
+  - Both have custom names (indicating custom cell types)
+- **Property Inheritance**: Offspring inherit:
+  - **Symbol**: Randomly selected from one parent
+  - **Color**: Randomly selected from one parent  
+  - **Name**: Blended from both parents (e.g., "Fire-Ice" or "Ice-Fire")
+- **Genetic Diversity**: This creates evolving populations with unique hybrid characteristics across generations!
+
 ### Mutations
 
 Add randomness to the simulation with mutations! When enabled, cells can:
@@ -30,7 +44,7 @@ Customize your cells with unique properties:
 - **Symbol**: Choose from various symbols (█, ●, ■, ◆, ★)
 - **Color**: Assign colors to differentiate cell types
 
-New cells inherit properties from their neighbors, creating evolving populations with diverse characteristics!
+New cells inherit properties from their neighbors through the offspring system, creating evolving populations with diverse characteristics and hybrid offspring names!
 
 ## Usage
 
@@ -69,11 +83,12 @@ python3 -m unittest test_game_of_life -v
 The implementation includes:
 - `Cell` class for customizable cells with properties
 - `GameOfLife` class with core game logic
+- **Offspring system** with two-parent breeding and compatibility checks
 - Mutation system for random changes
 - Character creation system for cell customization
 - Several predefined patterns (glider, blinker, toad, beacon, pulsar)
 - Terminal-based visualization with custom symbols
-- Comprehensive unit tests (23 tests covering all features)
+- Comprehensive unit tests (31 tests covering all features including offspring mechanics)
 
 ## Requirements
 
