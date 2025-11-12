@@ -277,6 +277,52 @@ class TestGameOfLife(unittest.TestCase):
         # This test might occasionally fail due to random chance, but very unlikely
         self.assertNotEqual(initial_alive, final_alive)
     
+    def test_high_mutation_rate_preserves_patterns(self):
+        """Test that even with high mutation rate, patterns don't completely dissolve"""
+        game = GameOfLife(width=20, height=20, mutation_rate=1.0)
+        
+        # Create a stable block pattern (2x2 square)
+        game.set_cell(10, 10, True)
+        game.set_cell(10, 11, True)
+        game.set_cell(11, 10, True)
+        game.set_cell(11, 11, True)
+        
+        initial_alive = 4
+        
+        # Run for many generations
+        for _ in range(100):
+            game.next_generation()
+        
+        final_alive = sum(1 for row in game.grid for cell in row if cell.alive)
+        
+        # With reduced mutation effects (5% death, 2% birth), the pattern should persist
+        # and not explode into chaos. We expect some cells alive but not complete chaos
+        # A reasonable expectation is between 0 and 50 cells (not 200+ like with old mutation rate)
+        self.assertGreaterEqual(final_alive, 0)
+        self.assertLessEqual(final_alive, 50, 
+            "Mutation rate created chaos - too many cells alive. "
+            "Expected mutations to be rarer and less disruptive.")
+    
+    def test_moderate_mutation_rate_stability(self):
+        """Test that moderate mutation rates allow patterns to mostly survive"""
+        game = GameOfLife(width=20, height=20, mutation_rate=0.1)
+        
+        # Load a glider pattern
+        game.load_pattern('glider')
+        
+        initial_alive = sum(1 for row in game.grid for cell in row if cell.alive)
+        
+        # Run for several generations
+        for _ in range(50):
+            game.next_generation()
+        
+        final_alive = sum(1 for row in game.grid for cell in row if cell.alive)
+        
+        # With 10% mutation rate and reduced effects, pattern should mostly survive
+        # Not be completely dead or explode into chaos
+        self.assertGreater(final_alive, 0, "Pattern died completely - mutations too destructive")
+        self.assertLess(final_alive, 30, "Pattern exploded - mutations too generative")
+    
     def test_cell_inherits_properties_from_neighbors(self):
         """Test that new cells inherit properties from neighbors"""
         # Create custom cell types

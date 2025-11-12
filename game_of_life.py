@@ -124,14 +124,14 @@ class GameOfLife:
                 # Apply mutations
                 if self.mutation_rate > 0 and random.random() < self.mutation_rate:
                     if new_grid[x][y].alive:
-                        # Mutate living cell - randomly kill it or change properties
-                        if random.random() < 0.5:
+                        # Mutate living cell - mostly change properties, rarely kill it
+                        if random.random() < 0.03:  # Only 3% chance to die from mutation
                             new_grid[x][y].alive = False
                         else:
                             self._mutate_cell(new_grid[x][y])
                     else:
-                        # Randomly birth a cell through mutation
-                        if random.random() < 0.3:
+                        # Very rarely birth a cell through mutation
+                        if random.random() < 0.01:  # Only 1% chance to spontaneously birth
                             new_grid[x][y].alive = True
                             self._mutate_cell(new_grid[x][y])
         
